@@ -1,5 +1,6 @@
 package com.numq.composesnippets.components.drawing
 
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -13,12 +14,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PointMode
@@ -29,30 +28,47 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun DrawingScreen() {
 
-    val currentBackStack = remember { mutableStateListOf<List<Offset>>(emptyList()) }
-
-    val undoBackStack = remember { mutableStateListOf<List<Offset>>(emptyList()) }
 
     val currentPoints = remember { mutableStateListOf<Offset>() }
 
+    val currentBackStack = remember { mutableStateListOf<List<Offset>>() }
+
+    val undoBackStack = remember { mutableStateListOf<List<Offset>>() }
+
+    LaunchedEffect(currentBackStack) {
+        Log.e(javaClass.simpleName, currentBackStack.joinToString("\n"))
+    }
+
     val (currentColor, setCurrentColor) = remember { mutableStateOf(Color.Green) }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        Canvas(
-            Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectDragGestures(onDragEnd = {
-                        currentBackStack.add(currentPoints)
-                        currentPoints.clear()
-                    }) { change, dragAmount ->
-                        change.consumeAllChanges()
-                        currentPoints.add(dragAmount)
-                    }
-                }) {
-            currentBackStack.forEach { points ->
-                drawPoints(points, pointMode = PointMode.Polygon, color = currentColor)
+    Box(
+        Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter
+    ) {
+        Canvas(modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .pointerInput(Unit) {
+                detectDragGestures(onDragEnd = {
+                    currentBackStack.add(listOf(*currentPoints.toTypedArray()))
+                    currentPoints.clear()
+                }) { change, _ ->
+                    change.consumeAllChanges()
+                    currentPoints.add(change.position)
+                }
             }
+        ) {
+            currentBackStack.forEach { points ->
+                drawPoints(
+                    points,
+                    pointMode = PointMode.Polygon,
+                    color = currentColor
+                )
+            }
+            drawPoints(
+                currentPoints,
+                pointMode = PointMode.Polygon,
+                color = currentColor
+            )
         }
         Card {
             Row(Modifier.padding(4.dp)) {
