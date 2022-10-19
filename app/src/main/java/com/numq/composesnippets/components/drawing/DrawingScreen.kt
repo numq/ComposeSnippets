@@ -1,12 +1,11 @@
 package com.numq.composesnippets.components.drawing
 
-import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.Card
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -28,28 +27,49 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun DrawingScreen() {
 
+    val darkTheme = isSystemInDarkTheme()
 
     val currentPoints = remember { mutableStateListOf<Offset>() }
 
-    val currentBackStack = remember { mutableStateListOf<List<Offset>>() }
+    val currentBackStack = remember { mutableStateListOf<DrawingTile>() }
 
-    val undoBackStack = remember { mutableStateListOf<List<Offset>>() }
+    val undoBackStack = remember { mutableStateListOf<DrawingTile>() }
 
-    LaunchedEffect(currentBackStack) {
-        Log.e(javaClass.simpleName, currentBackStack.joinToString("\n"))
+    var currentColor by remember { mutableStateOf(if (darkTheme) Color.White else Color.Black) }
+
+    val colors = listOf(Color.Black, Color.White).sortedBy { darkTheme } + listOf(
+        Color.Red,
+        Color.Green,
+        Color.Blue,
+        Color.Yellow,
+        Color.Cyan,
+        Color.Magenta
+    )
+
+    val (colorPickerVisible, setColorPickerVisible) = remember { mutableStateOf(false) }
+
+    BackHandler(colorPickerVisible) {
+        setColorPickerVisible(false)
     }
 
-    val (currentColor, setCurrentColor) = remember { mutableStateOf(Color.Green) }
-
     Box(
-        Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter
+        Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { if (colorPickerVisible) setColorPickerVisible(false) },
+        contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier
             .fillMaxSize()
             .clipToBounds()
+            .background(if (darkTheme) Color.Black else Color.White)
             .pointerInput(Unit) {
                 detectDragGestures(onDragEnd = {
-                    currentBackStack.add(listOf(*currentPoints.toTypedArray()))
+                    currentBackStack.add(
+                        DrawingTile(
+                            currentColor,
+                            currentPoints.toList()
+                        )
+                    )
                     currentPoints.clear()
                 }) { change, _ ->
                     change.consumeAllChanges()
@@ -57,11 +77,11 @@ fun DrawingScreen() {
                 }
             }
         ) {
-            currentBackStack.forEach { points ->
+            currentBackStack.forEach { (color, points) ->
                 drawPoints(
                     points,
                     pointMode = PointMode.Polygon,
-                    color = currentColor
+                    color = color
                 )
             }
             drawPoints(
@@ -70,28 +90,55 @@ fun DrawingScreen() {
                 color = currentColor
             )
         }
-        Card {
-            Row(Modifier.padding(4.dp)) {
-                IconButton(onClick = {
-                    if (currentBackStack.isNotEmpty()) {
-                        undoBackStack.add(currentBackStack.last())
-                        currentBackStack.removeLast()
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            Card {
+                Row(
+                    Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        if (currentBackStack.isNotEmpty()) {
+                            undoBackStack.add(currentBackStack.last())
+                            currentBackStack.removeLast()
+                        }
+                    }) {
+                        Icon(Icons.Rounded.ArrowBack, "undo")
                     }
-                }) {
-                    Icon(Icons.Rounded.ArrowBack, "undo")
-                }
-                IconButton(onClick = {
-                    currentBackStack.clear()
-                }) {
-                    Icon(Icons.Rounded.Clear, "remove content")
-                }
-                IconButton(onClick = {
-                    if (undoBackStack.isNotEmpty()) {
-                        currentBackStack.add(undoBackStack.last())
-                        undoBackStack.removeLast()
+                    IconButton(onClick = {
+                        currentBackStack.clear()
+                    }) {
+                        Icon(Icons.Rounded.Clear, "remove content")
                     }
-                }) {
-                    Icon(Icons.Rounded.ArrowForward, "redo")
+                    IconButton(onClick = {
+                        if (undoBackStack.isNotEmpty()) {
+                            currentBackStack.add(undoBackStack.last())
+                            undoBackStack.removeLast()
+                        }
+                    }) {
+                        Icon(Icons.Rounded.ArrowForward, "redo")
+                    }
+                }
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp), contentAlignment = Alignment.BottomEnd) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (colorPickerVisible) {
+                        colors.filter { it != currentColor }.forEach { color ->
+                            ColorItem(color) {
+                                currentColor = color
+                                setColorPickerVisible(false)
+                            }
+                        }
+                    }
+                    ColorItem(currentColor) {
+                        setColorPickerVisible(!colorPickerVisible)
+                    }
                 }
             }
         }
