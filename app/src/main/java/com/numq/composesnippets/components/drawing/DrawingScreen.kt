@@ -10,9 +10,9 @@ import androidx.compose.material.Card
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.Redo
+import androidx.compose.material.icons.rounded.Undo
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,12 +52,7 @@ fun DrawingScreen() {
         setColorPickerVisible(false)
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) { if (colorPickerVisible) setColorPickerVisible(false) },
-        contentAlignment = Alignment.Center
-    ) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier
             .fillMaxSize()
             .clipToBounds()
@@ -91,44 +86,16 @@ fun DrawingScreen() {
             )
         }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            Card {
-                Row(
-                    Modifier.padding(4.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = {
-                        if (currentBackStack.isNotEmpty()) {
-                            undoBackStack.add(currentBackStack.last())
-                            currentBackStack.removeLast()
-                        }
-                    }) {
-                        Icon(Icons.Rounded.ArrowBack, "undo")
-                    }
-                    IconButton(onClick = {
-                        currentBackStack.clear()
-                    }) {
-                        Icon(Icons.Rounded.Clear, "remove content")
-                    }
-                    IconButton(onClick = {
-                        if (undoBackStack.isNotEmpty()) {
-                            currentBackStack.add(undoBackStack.last())
-                            undoBackStack.removeLast()
-                        }
-                    }) {
-                        Icon(Icons.Rounded.ArrowForward, "redo")
-                    }
-                }
-            }
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(16.dp), contentAlignment = Alignment.BottomEnd) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (colorPickerVisible) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                if (colorPickerVisible) {
+                    Row(
+                        Modifier.padding(4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         colors.filter { it != currentColor }.forEach { color ->
                             ColorItem(color) {
                                 currentColor = color
@@ -136,11 +103,41 @@ fun DrawingScreen() {
                             }
                         }
                     }
-                    ColorItem(currentColor) {
-                        setColorPickerVisible(!colorPickerVisible)
+                }
+                Card {
+                    Row(
+                        Modifier.padding(4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {
+                            currentBackStack.clear()
+                        }) {
+                            Icon(Icons.Rounded.Clear, "remove content")
+                        }
+                        IconButton(onClick = {
+                            if (currentBackStack.isNotEmpty()) {
+                                undoBackStack.add(currentBackStack.last())
+                                currentBackStack.removeLast()
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Undo, "undo")
+                        }
+                        IconButton(onClick = {
+                            if (undoBackStack.isNotEmpty()) {
+                                currentBackStack.add(undoBackStack.last())
+                                undoBackStack.removeLast()
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Redo, "redo")
+                        }
+                        ColorItem(currentColor) {
+                            setColorPickerVisible(!colorPickerVisible)
+                        }
                     }
                 }
             }
+
         }
     }
 }
