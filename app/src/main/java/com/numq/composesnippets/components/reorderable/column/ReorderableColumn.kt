@@ -1,5 +1,6 @@
-package com.numq.composesnippets.components.reorder
+package com.numq.composesnippets.components.reorderable.column
 
+import android.util.Log
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,7 +22,7 @@ import androidx.compose.ui.zIndex
 
 
 @Composable
-fun <T> ReorderableColumn(
+fun <T : Any> ReorderableColumn(
     items: MutableList<T>,
     onMove: (Int, Int) -> Unit,
     onItemContent: @Composable (T) -> Unit
@@ -31,19 +32,61 @@ fun <T> ReorderableColumn(
 
     var draggingItem by remember { mutableStateOf<LazyListItemInfo?>(null) }
 
+    LaunchedEffect(draggingItem) {
+        Log.e(javaClass.simpleName, draggingItem?.index.toString())
+    }
+
     var offsetY by remember { mutableStateOf(0f) }
+
+    val dragDirection by derivedStateOf {
+        when {
+            offsetY < 0 -> ColumnDragDirection.UP
+            offsetY > 0 -> ColumnDragDirection.DOWN
+            else -> ColumnDragDirection.NONE
+        }
+    }
 
     val hoveredItem by derivedStateOf {
         draggingItem?.let { dragging ->
             lazyListState.layoutInfo.visibleItemsInfo
                 .filter { it.key != dragging.key }
                 .firstOrNull { item ->
-                    (dragging.offset + offsetY).toInt() in (item.offset..item.offset + item.size)
+                    when (dragDirection) {
+                        ColumnDragDirection.UP -> (dragging.offset + dragging.size + offsetY).toInt() in (item.offset..item.offset + item.size)
+                        ColumnDragDirection.DOWN -> (dragging.offset + offsetY).toInt() in (item.offset..item.offset + item.size)
+                        else -> false
+                    }
                 }
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val topReached by derivedStateOf {
+            draggingItem?.let { dragging ->
+                dragging.offset + offsetY < 0 && dragging.index > 0
+            } ?: false
+        }
+        LaunchedEffect(topReached) {
+            if (topReached) {
+                draggingItem?.let {
+                    lazyListState.animateScrollToItem(it.index - 1)
+                    Log.e(javaClass.simpleName, "topReached")
+                }
+            }
+        }
+        val bottomReached by derivedStateOf {
+            draggingItem?.let { dragging ->
+                dragging.offset + dragging.size + offsetY > maxHeight.value && dragging.index < lazyListState.layoutInfo.totalItemsCount
+            } ?: false
+        }
+        LaunchedEffect(bottomReached) {
+            if (bottomReached) {
+                draggingItem?.let {
+                    lazyListState.animateScrollToItem(it.index + 1)
+                    Log.e(javaClass.simpleName, "bottomReached")
+                }
+            }
+        }
         LazyColumn(
             Modifier
                 .fillMaxSize()
@@ -52,17 +95,15 @@ fun <T> ReorderableColumn(
             verticalArrangement = Arrangement.Top,
             state = lazyListState
         ) {
-            itemsIndexed(items) { index, item ->
+            itemsIndexed(items, key = { _, i -> i }) { index, item ->
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .height(128.dp)
+                        .height(maxHeight / 5)
                         .zIndex(if (draggingItem?.index == index) 1f else 0f)
                         .graphicsLayer {
-                            draggingItem?.let { dragging ->
-                                if (dragging.index == index) {
-                                    translationY = offsetY
-                                }
+                            if (draggingItem?.index == index) {
+                                translationY = offsetY
                             }
                         },
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -71,7 +112,7 @@ fun <T> ReorderableColumn(
                     Card(
                         Modifier
                             .graphicsLayer {
-                                if (index == draggingItem?.index) {
+                                if (draggingItem?.index == index) {
                                     alpha = .5f
                                     scaleX = .9f
                                 }
@@ -89,10 +130,7 @@ fun <T> ReorderableColumn(
                             .padding(8.dp)
                             .pointerInput(Unit) {
                                 detectDragGestures(onDragStart = {
-                                    draggingItem =
-                                        lazyListState.layoutInfo.visibleItemsInfo.getOrNull(
-                                            index
-                                        )
+                                    draggingItem = lazyListState.layoutInfo.visibleItemsInfo.find { it.key == item }
                                 }, onDragEnd = {
                                     draggingItem = null
                                     offsetY = 0f
@@ -108,7 +146,7 @@ fun <T> ReorderableColumn(
                                                 dragging.index,
                                                 hovered.index
                                             )
-                                            draggingItem = hovered
+                                            draggingItem = hoveredItem
                                             offsetY += ((dragging.index - hovered.index) * dragging.size)
                                         }
                                     }
