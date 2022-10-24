@@ -1,4 +1,4 @@
-package com.numq.composesnippets.components.reorder
+package com.numq.composesnippets.components.reorderable.column
 
 import android.util.Log
 import androidx.compose.material.Text

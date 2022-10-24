@@ -1,5 +1,5 @@
 package com.numq.composesnippets.components.reorderable.column
 
-enum class ColumnDragDirection {
+internal enum class DragDirection {
     NONE, UP, DOWN
 }
