@@ -1,13 +1,11 @@
 package com.numq.composesnippets.components.reorderable.column
 
-import android.util.Log
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.Card
 import androidx.compose.material.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Reorder
@@ -23,142 +21,105 @@ import androidx.compose.ui.zIndex
 
 @Composable
 fun <T : Any> ReorderableColumn(
-    items: MutableList<T>,
-    onMove: (Int, Int) -> Unit,
-    onItemContent: @Composable (T) -> Unit
+    modifier: Modifier,
+    data: List<T>,
+    onMove: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
+    itemContent: @Composable (T) -> Unit
 ) {
 
-    val lazyListState = rememberLazyListState()
-
-    var draggingItem by remember { mutableStateOf<LazyListItemInfo?>(null) }
-
-    LaunchedEffect(draggingItem) {
-        Log.e(javaClass.simpleName, draggingItem?.index.toString())
-    }
+    val listState = rememberLazyListState()
 
     var offsetY by remember { mutableStateOf(0f) }
 
     val dragDirection by derivedStateOf {
         when {
-            offsetY < 0 -> ColumnDragDirection.UP
-            offsetY > 0 -> ColumnDragDirection.DOWN
-            else -> ColumnDragDirection.NONE
+            offsetY < 0 -> DragDirection.UP
+            offsetY > 0 -> DragDirection.DOWN
+            else -> DragDirection.NONE
         }
     }
 
-    val hoveredItem by derivedStateOf {
-        draggingItem?.let { dragging ->
-            lazyListState.layoutInfo.visibleItemsInfo
-                .filter { it.key != dragging.key }
+    var draggableItem by remember { mutableStateOf<LazyListItemInfo?>(null) }
+
+    val overlappedItem by derivedStateOf {
+        draggableItem?.let { draggable ->
+            val offset = draggable.offset
+            val size = draggable.size
+            listState.layoutInfo.visibleItemsInfo
+                .filterNot { it.index == draggable.index }
                 .firstOrNull { item ->
                     when (dragDirection) {
-                        ColumnDragDirection.UP -> (dragging.offset + dragging.size + offsetY).toInt() in (item.offset..item.offset + item.size)
-                        ColumnDragDirection.DOWN -> (dragging.offset + offsetY).toInt() in (item.offset..item.offset + item.size)
+                        DragDirection.UP -> (offset + size + offsetY).toInt() in (item.offset..item.offset + item.size)
+                        DragDirection.DOWN -> (offset + offsetY).toInt() in (item.offset..item.offset + item.size)
                         else -> false
                     }
                 }
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val topReached by derivedStateOf {
-            draggingItem?.let { dragging ->
-                dragging.offset + offsetY < 0 && dragging.index > 0
-            } ?: false
-        }
-        LaunchedEffect(topReached) {
-            if (topReached) {
-                draggingItem?.let {
-                    lazyListState.animateScrollToItem(it.index - 1)
-                    Log.e(javaClass.simpleName, "topReached")
-                }
-            }
-        }
-        val bottomReached by derivedStateOf {
-            draggingItem?.let { dragging ->
-                dragging.offset + dragging.size + offsetY > maxHeight.value && dragging.index < lazyListState.layoutInfo.totalItemsCount
-            } ?: false
-        }
-        LaunchedEffect(bottomReached) {
-            if (bottomReached) {
-                draggingItem?.let {
-                    lazyListState.animateScrollToItem(it.index + 1)
-                    Log.e(javaClass.simpleName, "bottomReached")
-                }
-            }
-        }
-        LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top,
-            state = lazyListState
-        ) {
-            itemsIndexed(items, key = { _, i -> i }) { index, item ->
-                Row(
+    LazyColumn(modifier, state = listState) {
+        itemsIndexed(data) { index, item ->
+            Row(
+                Modifier
+                    .zIndex(if (draggableItem?.index == index) 1f else 0f)
+                    .graphicsLayer {
+                        if (draggableItem?.index == index) {
+                            translationY = offsetY
+                            scaleX = .9f
+                        }
+                    },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
                     Modifier
-                        .fillMaxWidth()
-                        .height(maxHeight / 5)
-                        .zIndex(if (draggingItem?.index == index) 1f else 0f)
+                        .weight(1f)
                         .graphicsLayer {
-                            if (draggingItem?.index == index) {
-                                translationY = offsetY
+                            if (draggableItem?.index == index) {
+                                alpha = .5f
                             }
                         },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    contentAlignment = Alignment.Center
                 ) {
-                    Card(
-                        Modifier
-                            .graphicsLayer {
-                                if (draggingItem?.index == index) {
-                                    alpha = .5f
-                                    scaleX = .9f
-                                }
-                            }
-                            .weight(1f)
-                            .padding(4.dp)
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            onItemContent(item)
-                        }
-                    }
-                    Box(
-                        Modifier
-                            .fillMaxHeight()
-                            .padding(8.dp)
-                            .pointerInput(Unit) {
-                                detectDragGestures(onDragStart = {
-                                    draggingItem = lazyListState.layoutInfo.visibleItemsInfo.find { it.key == item }
-                                }, onDragEnd = {
-                                    draggingItem = null
-                                    offsetY = 0f
-                                }, onDragCancel = {
-                                    offsetY = 0f
-                                    draggingItem = null
-                                }) { change, (_, y) ->
-                                    change.consumeAllChanges()
-                                    offsetY += y
-                                    draggingItem?.let { dragging ->
-                                        hoveredItem?.let { hovered ->
-                                            onMove(
-                                                dragging.index,
-                                                hovered.index
-                                            )
-                                            draggingItem = hoveredItem
-                                            offsetY += ((dragging.index - hovered.index) * dragging.size)
-                                        }
+                    itemContent(item)
+                }
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .padding(8.dp)
+                        .pointerInput(Unit) {
+                            detectDragGestures(onDragStart = {
+                                listState.layoutInfo.visibleItemsInfo
+                                    .find { i ->
+                                        i.index == index
+                                    }
+                                    ?.let {
+                                        draggableItem = it
+                                    }
+                            }, onDragCancel = {
+                                offsetY = 0f
+                                draggableItem = null
+                            }, onDragEnd = {
+                                draggableItem = null
+                                offsetY = 0f
+                            }) { change, (_, y) ->
+                                change.consumeAllChanges()
+                                offsetY += y
+                                draggableItem?.let { draggable ->
+                                    overlappedItem?.let { overlapped ->
+                                        onMove(draggable.index, overlapped.index)
+                                        draggableItem = overlapped
+                                        offsetY += ((draggable.index - overlapped.index) * draggable.size)
                                     }
                                 }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Rounded.Reorder,
-                            "reorder list"
-                        )
-                    }
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.Reorder,
+                        "reorder column"
+                    )
                 }
             }
         }
