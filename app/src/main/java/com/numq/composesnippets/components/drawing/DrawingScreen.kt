@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PointMode
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -88,14 +89,16 @@ fun DrawingScreen() {
                     points,
                     pointMode = PointMode.Polygon,
                     color = color,
-                    strokeWidth = brushSize
+                    strokeWidth = brushSize,
+                    cap = StrokeCap.Round
                 )
             }
             drawPoints(
                 currentPoints,
                 pointMode = PointMode.Polygon,
                 color = currentColor,
-                strokeWidth = currentBrushSize
+                strokeWidth = currentBrushSize,
+                cap = StrokeCap.Round
             )
         }
         Box(contentAlignment = Alignment.Center) {
