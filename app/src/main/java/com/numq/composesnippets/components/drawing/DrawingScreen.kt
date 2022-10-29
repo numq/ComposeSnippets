@@ -1,16 +1,16 @@
 package com.numq.composesnippets.components.drawing
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.Redo
-import androidx.compose.material.icons.rounded.Undo
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -30,9 +31,13 @@ import kotlin.math.sign
 @Composable
 fun DrawingScreen() {
 
+    val coroutineScope = rememberCoroutineScope()
+
     val darkTheme = isSystemInDarkTheme()
 
-    val coroutineScope = rememberCoroutineScope()
+    val defaultColor = if (darkTheme) Color.White else Color.Black
+
+    val defaultBackgroundColor = if (darkTheme) Color.Black else Color.White
 
     val currentPoints = remember { mutableStateListOf<Offset>() }
 
@@ -44,9 +49,9 @@ fun DrawingScreen() {
 
     var currentBrushSize by remember { mutableStateOf(minBrushSize) }
 
-    var isBrushSizeChanging by remember { mutableStateOf(false) }
+    var brushSizeState by remember { mutableStateOf(BrushSizeState.NONE) }
 
-    var currentColor by remember { mutableStateOf(if (darkTheme) Color.White else Color.Black) }
+    var currentColor by remember { mutableStateOf(defaultColor) }
 
     val colors = listOf(Color.Black, Color.White).sortedBy { darkTheme } + listOf(
         Color.Red,
@@ -67,7 +72,7 @@ fun DrawingScreen() {
         Canvas(modifier = Modifier
             .fillMaxSize()
             .clipToBounds()
-            .background(if (darkTheme) Color.Black else Color.White)
+            .background(defaultBackgroundColor)
             .pointerInput(Unit) {
                 detectDragGestures(onDragEnd = {
                     currentBackStack.add(
@@ -113,37 +118,65 @@ fun DrawingScreen() {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                            if (brushSizeState != BrushSizeState.NONE) {
+                                Divider(
+                                    thickness = currentBrushSize.dp,
+                                    color = currentColor
+                                )
+                            }
+                            Row(
+                                Modifier.padding(4.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (isBrushSizeChanging) {
-                                    Divider(
-                                        Modifier.fillMaxWidth(),
-                                        thickness = currentBrushSize.dp,
-                                        color = currentColor
+                                if (brushSizeState == BrushSizeState.INCREASING) {
+                                    Icon(
+                                        Icons.Rounded.Add,
+                                        "increase color value",
+                                        tint = defaultColor
                                     )
                                 }
-                                Card {
-                                    Text(
-                                        "${currentBrushSize.roundToInt()}.px",
-                                        Modifier.pointerInput(Unit) {
-                                            detectDragGestures(onDragStart = {
-                                                isBrushSizeChanging = true
-                                            }, onDragCancel = {
-                                                isBrushSizeChanging = false
+                                Card(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .pointerInput(Unit) {
+                                            detectDragGestures(onDragCancel = {
+                                                brushSizeState = BrushSizeState.NONE
                                             }, onDragEnd = {
-                                                isBrushSizeChanging = false
-                                            }) { change, (x, y) ->
+                                                brushSizeState = BrushSizeState.NONE
+                                            }) { change, _ ->
                                                 change.consumeAllChanges()
+                                                val x = change.position.x
+                                                Log.e(javaClass.simpleName, x.toString())
+                                                when {
+                                                    x > 0 -> brushSizeState =
+                                                        BrushSizeState.INCREASING
+                                                    x < 0 -> brushSizeState =
+                                                        BrushSizeState.DECREASING
+                                                    else -> Unit
+                                                }
                                                 coroutineScope.launch {
                                                     currentBrushSize =
-                                                        currentBrushSize.plus(sign(x) * 1)
+                                                        currentBrushSize
+                                                            .plus(sign(x))
                                                             .coerceIn(minBrushSize, maxBrushSize)
-                                                    delay(1000L)
+                                                    delay(500L)
                                                 }
                                             }
-                                        }
+                                        }, backgroundColor = currentColor, shape = CircleShape
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            "${currentBrushSize.roundToInt()}.px",
+                                            color = if (currentColor.luminance() < 0) Color.White else Color.Black
+                                        )
+                                    }
+                                }
+                                if (brushSizeState == BrushSizeState.DECREASING) {
+                                    Icon(
+                                        Icons.Rounded.Remove,
+                                        "decrease color value",
+                                        tint = defaultColor
                                     )
                                 }
                             }
