@@ -41,9 +41,9 @@ fun DrawingScreen() {
 
     val currentPoints = remember { mutableStateListOf<Offset>() }
 
-    val currentBackStack = remember { mutableStateListOf<DrawingTile>() }
+    val currentBackStack = remember { mutableStateListOf<DrawingStroke>() }
 
-    val undoBackStack = remember { mutableStateListOf<DrawingTile>() }
+    val undoBackStack = remember { mutableStateListOf<DrawingStroke>() }
 
     val (minBrushSize, maxBrushSize) = Pair(4f, 100f)
 
@@ -76,7 +76,7 @@ fun DrawingScreen() {
             .pointerInput(Unit) {
                 detectDragGestures(onDragEnd = {
                     currentBackStack.add(
-                        DrawingTile(
+                        DrawingStroke(
                             currentColor,
                             currentBrushSize,
                             currentPoints.toList()
