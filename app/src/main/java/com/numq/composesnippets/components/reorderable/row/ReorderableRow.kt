@@ -1,5 +1,6 @@
 package com.numq.composesnippets.components.reorderable.row
 
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyListItemInfo
@@ -13,6 +14,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 @Composable
 fun <T : Any> ReorderableRow(
@@ -26,15 +29,31 @@ fun <T : Any> ReorderableRow(
 
     var offsetX by remember { mutableStateOf(0f) }
 
-    val dragDirection by derivedStateOf {
-        when {
-            offsetX < 0 -> DragDirection.LEFT
-            offsetX > 0 -> DragDirection.RIGHT
-            else -> DragDirection.NONE
+    var draggableItem by remember { mutableStateOf<LazyListItemInfo?>(null) }
+
+    val overscrollStart by derivedStateOf {
+        draggableItem?.let { draggable ->
+            val anchor = draggable.offset + offsetX
+            if (anchor < 0) -draggable.size else null
         }
     }
 
-    var draggableItem by remember { mutableStateOf<LazyListItemInfo?>(null) }
+    val overscrollEnd by derivedStateOf {
+        draggableItem?.let { draggable ->
+            val anchor = draggable.offset + draggable.size + offsetX
+            if (anchor > listState.layoutInfo.viewportEndOffset) draggable.size else null
+        }
+    }
+
+    LaunchedEffect(overscrollStart, overscrollEnd) {
+        overscrollStart?.let {
+            listState.animateScrollBy(it.toFloat())
+        }
+        overscrollEnd?.let {
+            listState.animateScrollBy(it.toFloat())
+        }
+        delay(500L)
+    }
 
     val overlappedItem by derivedStateOf {
         draggableItem?.let { draggable ->
@@ -43,11 +62,7 @@ fun <T : Any> ReorderableRow(
             listState.layoutInfo.visibleItemsInfo
                 .filterNot { it.index == draggable.index }
                 .firstOrNull { item ->
-                    when (dragDirection) {
-                        DragDirection.LEFT -> (offset + size + offsetX).toInt() in (item.offset..item.offset + item.size)
-                        DragDirection.RIGHT -> (offset + offsetX).toInt() in (item.offset..item.offset + item.size)
-                        else -> false
-                    }
+                    (offset + size / 2 + offsetX).roundToInt() in (item.offset..item.offset + item.size)
                 }
         }
     }
