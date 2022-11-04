@@ -1,36 +1,26 @@
 package com.numq.composesnippets.components.reorderable.modifier
 
-import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.zIndex
 
-fun Modifier.reorderTarget(initialIndex: Int, reorderableState: ReorderableState) = composed {
+fun Modifier.reorderTarget(initialIndex: Int, reorderableState: ReorderableState) = then(
     with(reorderableState) {
-        LaunchedEffect(overscrollValue) {
-            if (overscrollValue != 0f) listState.animateScrollBy(overscrollValue)
-        }
         Modifier
             .run {
                 if (draggableItem?.index == initialIndex) {
                     zIndex(1f)
                     graphicsLayer {
-                        when (listType) {
-                            ListType.Row -> translationX = offsetX
-                            ListType.Column -> translationY = offsetY
-                            ListType.Grid -> {
-                                translationX = offsetX
-                                translationY = offsetY
-                            }
+                        when (listState.layoutInfo.orientation) {
+                            Orientation.Horizontal -> translationX = offsetX
+                            Orientation.Vertical -> translationY = offsetY
                         }
                         scaleX = .9f
                     }
-                } else this
+                } else zIndex(-1f)
             }
             .pointerInput(Unit) {
                 detectDragGesturesAfterLongPress(onDragStart = {
@@ -51,16 +41,11 @@ fun Modifier.reorderTarget(initialIndex: Int, reorderableState: ReorderableState
                     offsetX = 0f
                     offsetY = 0f
                 }) { change, (x, y) ->
-                    change.consumeAllChanges()
-                    when (listType) {
-                        ListType.Row -> offsetX += x
-                        ListType.Column -> offsetY += y
-                        ListType.Grid -> {
-                            offsetX += x
-                            offsetY += y
-                        }
+                    change.consume()
+                    when (listState.layoutInfo.orientation) {
+                        Orientation.Horizontal -> offsetX += x
+                        Orientation.Vertical -> offsetY += y
                     }
                 }
             }
-    }
-}
+    })
